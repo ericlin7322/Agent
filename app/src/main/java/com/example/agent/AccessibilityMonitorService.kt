@@ -16,6 +16,10 @@ import java.io.IOException
 import java.io.OutputStreamWriter
 
 class AccessibilityMonitorService : AccessibilityService() {
+    companion object {
+        var explore_tree  = ""
+    }
+
     private lateinit var logger: Logger
     private lateinit var expfileOutputStream: FileOutputStream
     private var expfileWriter: BufferedWriter? = null
@@ -27,6 +31,11 @@ class AccessibilityMonitorService : AccessibilityService() {
     private var lastEventRunnable: Runnable? = null
     private var previousRoot: AccessibilityNodeInfo? = null
 
+    private lateinit var runnable: Runnable
+    private val interval = 1000L
+    private var nav_tree = ""
+    private var exp_tree = ""
+
 
     override fun onCreate() {
         super.onCreate()
@@ -36,6 +45,11 @@ class AccessibilityMonitorService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         PermissionViewModel.updatePermissionList(this)
+        runnable = Runnable {
+            saveNodeToFile()
+            handler.postDelayed(runnable, interval)
+        }
+        handler.post(runnable)
     }
 
     private fun initializeFileOutput() {
@@ -57,119 +71,115 @@ class AccessibilityMonitorService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         logger = Logger(this)
-        lastEventRunnable?.let { handler.removeCallbacks(it) }
+        val source = event.source ?: return
+        val rootNode = rootInActiveWindow ?: return
+        Log.d("AccessibilityMonitor", event.toString())
+        Log.d("AccessibilityMonitor", rootNode.hashCode().toString())
 
-        lastEventRunnable = Runnable {
-            val source = event.source ?: return@Runnable
-            val rootNode = rootInActiveWindow ?: return@Runnable
-            Log.d("AccessibilityCheck", rootNode.hashCode().toString())
-
-            if (previousRoot != null) {
-                val isEqual = previousRoot == rootNode
-                Log.d("AccessibilityCheck", "Are they equal? $isEqual")
-            }
-
-            previousRoot = rootNode
-
-            try {
-                initializeFileOutput()
-                expfileWriter?.flush()
-                navfileWriter?.flush()
-                processNodeInfo(rootNode)
-            } catch (e: Exception) {
-                Log.e("AccessibilityMonitor", "Error writing to file: ${e.message}")
-            }
+        try {
+            nav_tree = getNavigateTree(rootNode)
+            exp_tree = getExploreTree(rootNode)
+        } catch (e: Exception) {
+            Log.e("AccessibilityMonitor", "Error writing to file: ${e.message}")
         }
-        handler.postDelayed(lastEventRunnable!!, 100)
     }
 
-    private fun processNodeInfo(nodeInfo: AccessibilityNodeInfo, depth: Int = 0) {
-        // Create indentation string
-        val indent = "  ".repeat(depth)
+    private fun saveNodeToFile() {
+        initializeFileOutput()
+        try {
+            navfileWriter?.write(nav_tree)
+            navfileWriter?.flush()
+            expfileWriter?.write(exp_tree)
+            expfileWriter?.flush()
+        } finally {
+            navfileWriter?.close()
+            expfileWriter?.close()
+        }
+    }
 
-        // Get node attributes
+    private fun getExploreTree(nodeInfo: AccessibilityNodeInfo, depth: Int = 0): String {
+        val stringBuilder = StringBuilder()
+        val indent = "  ".repeat(depth)
         val className = nodeInfo.className?.toString() ?: "null"
+        val simpleClassName = className.substring(className.lastIndexOf(".") + 1)
         val text = nodeInfo.text?.toString() ?: "null"
         val description = nodeInfo.contentDescription?.toString() ?: "null"
         val stateDescription = nodeInfo.stateDescription?.toString() ?: "null"
         val packageName = nodeInfo.packageName?.toString() ?: "null"
 
-        // Get bounds
         val rect = Rect()
         nodeInfo.getBoundsInScreen(rect)
         val bounds = "[${rect.left}, ${rect.top}][${rect.right}, ${rect.bottom}]"
 
-        // Get container title (window title)
-        val containerTitle = nodeInfo.paneTitle?.toString() ?: "null"
-
-        // Boolean states
-//        val states = "checkable: ${nodeInfo.isCheckable}," +
-//                "checked: ${nodeInfo.isChecked}," +
-//                "focusable: ${nodeInfo.isFocusable}," +
-//                "focused: ${nodeInfo.isFocused}," +
-//                "selected: ${nodeInfo.isSelected}," +
-//                "clickable: ${nodeInfo.isClickable}," +
-//                "longClickable: ${nodeInfo.isLongClickable}," +
-//                "contextClickable: ${nodeInfo.isContextClickable}," +
-//                "enabled: ${nodeInfo.isEnabled}," +
-//                "password: ${nodeInfo.isPassword}," +
-//                "scrollable: ${nodeInfo.isScrollable}," +
-//                "visible: ${nodeInfo.isVisibleToUser}," +
-//                "textSelectable: ${nodeInfo.isTextSelectable()}"
-
-        val states = "${nodeInfo.isCheckable}," +
-                "${nodeInfo.isChecked}," +
-                "${nodeInfo.isClickable}," +
-                "${nodeInfo.isEnabled}," +
-                "${nodeInfo.isFocusable}," +
-                "${nodeInfo.isFocused}," +
-                "${nodeInfo.isScrollable}," +
-                "${nodeInfo.isLongClickable}," +
-                "${nodeInfo.isSelected}," +
-//                "${nodeInfo.isContextClickable}," +
-                "${nodeInfo.isPassword}," +
-                "${nodeInfo.isVisibleToUser}," +
-//                "${nodeInfo.isTextSelectable()}"
-
-        // Log all information with proper indentation
-        Log.d("AccessibilityInfo", "$indent├─ Node: $className, Text: $text, ContentDescription: $description, ${nodeInfo.viewIdResourceName}, ${nodeInfo.uniqueId}, ${nodeInfo.windowId}")
-//        Log.d("AccessibilityInfo", "$indent│  Text: $text")
-//        Log.d("AccessibilityInfo", "$indent│  ContentDescription: $description")
-//        Log.d("AccessibilityInfo", "$indent│  StateDescription: $stateDescription")
-//        Log.d("AccessibilityInfo", "$indent│  ContainerTitle: $containerTitle")
-//        Log.d("AccessibilityInfo", "$indent│  Bounds: $bounds")
-//        Log.d("AccessibilityInfo", "$indent│  States: $states")
-
-//        logger.d("$indent├─ Node: $className")
-//        logger.d("$indent│  Text: $text")
-//        logger.d("$indent│  ContentDescription: $description")
-////        Log.d("AccessibilityInfo", "$indent│  StateDescription: $stateDescription")
-////        Log.d("AccessibilityInfo", "$indent│  ContainerTitle: $containerTitle")
-//        logger.d("$indent│  Bounds: $bounds")
-//        logger.d("$indent│  States: $states")
-
-//        logger.d("$indent├─ Node(class:$className,text:$text,content-desc:$description,bounds:$bounds,$states)")
-
-        val navNodeInfoText = "$indent├─ Node($className,$text,$description,$bounds,$states)\n"
-        try {
-            navfileWriter?.write(navNodeInfoText)
-            navfileWriter?.flush() // Ensure it's written immediately
-        } catch (e: IOException) {
-            Log.e("AccessibilityMonitor", "Error writing to file: ${e.message}")
-        }
-
-        val expNodeInfoText = "$indent├─ Node($className,$text,$description,${nodeInfo.hashCode()})\n"
-        try {
-            expfileWriter?.write(expNodeInfoText)
-            expfileWriter?.flush() // Ensure it's written immediately
-        } catch (e: IOException) {
-            Log.e("AccessibilityMonitor", "Error writing to file: ${e.message}")
-        }
+//        Log.d("AccessibilityInfo", "$indent├─ Node: $className, Text: $text, ContentDescription: $description, ${nodeInfo.viewIdResourceName}, ${nodeInfo.uniqueId}, ${nodeInfo.windowId}")
+        val expNodeInfoText = "$indent├─ Node($simpleClassName,$text,$description,${nodeInfo.hashCode()})\n"
+        stringBuilder.append(expNodeInfoText)
 
         for (i in 0 until nodeInfo.childCount) {
             val childNode = nodeInfo.getChild(i) ?: continue
-            processNodeInfo(childNode, depth + 1)
+            stringBuilder.append(getExploreTree(childNode, depth + 1))
         }
+
+        return stringBuilder.toString()
+    }
+
+    private fun getNavigateTree(nodeInfo: AccessibilityNodeInfo, depth: Int = 0): String {
+        val stringBuilder = StringBuilder()
+
+        val indent = "  ".repeat(depth)
+        val className = nodeInfo.className?.toString() ?: "null"
+        val simpleClassName = className.substring(className.lastIndexOf(".") + 1)
+        val text = nodeInfo.text?.toString() ?: "null"
+        val description = nodeInfo.contentDescription?.toString() ?: "null"
+        val stateDescription = nodeInfo.stateDescription?.toString() ?: "null"
+        val packageName = nodeInfo.packageName?.toString() ?: "null"
+
+        val rect = Rect()
+        nodeInfo.getBoundsInScreen(rect)
+        val bounds = "[${rect.left}, ${rect.top}][${rect.right}, ${rect.bottom}]"
+
+        val containerTitle = nodeInfo.paneTitle?.toString() ?: "null"
+
+        // Boolean states
+        val states = "checkable:${nodeInfo.isCheckable}," +
+                "checked:${nodeInfo.isChecked}," +
+                "clickable:${nodeInfo.isClickable}," +
+                "enabled:${nodeInfo.isEnabled}," +
+                "focusable:${nodeInfo.isFocusable}," +
+                "focused:${nodeInfo.isFocused}," +
+                "scrollable:${nodeInfo.isScrollable}," +
+                "longClickable:${nodeInfo.isLongClickable}," +
+                "selected:${nodeInfo.isSelected}," +
+//                "contextClickable: ${nodeInfo.isContextClickable}," +
+                "password:${nodeInfo.isPassword}," +
+                "visible:${nodeInfo.isVisibleToUser},"
+//                "textSelectable: ${nodeInfo.isTextSelectable()}"
+
+//        val states = "${nodeInfo.isCheckable}," +
+//                "${nodeInfo.isChecked}," +
+//                "${nodeInfo.isClickable}," +
+//                "${nodeInfo.isEnabled}," +
+//                "${nodeInfo.isFocusable}," +
+//                "${nodeInfo.isFocused}," +
+//                "${nodeInfo.isScrollable}," +
+//                "${nodeInfo.isLongClickable}," +
+//                "${nodeInfo.isSelected}," +
+////                "${nodeInfo.isContextClickable}," +
+//                "${nodeInfo.isPassword}," +
+//                "${nodeInfo.isVisibleToUser},"
+//                "${nodeInfo.isTextSelectable()}"
+
+//        Log.d("AccessibilityInfo", "$indent├─ Node: $className, Text: $text, ContentDescription: $description, ${nodeInfo.viewIdResourceName}, ${nodeInfo.uniqueId}, ${nodeInfo.windowId}")
+
+        val navNodeInfoText = "$indent├─ Node($simpleClassName,$text,$description,$bounds,$states)\n"
+        stringBuilder.append(navNodeInfoText)
+
+        for (i in 0 until nodeInfo.childCount) {
+            val childNode = nodeInfo.getChild(i) ?: continue
+            stringBuilder.append(getNavigateTree(childNode, depth + 1))
+        }
+
+        return stringBuilder.toString()
     }
 
     override fun onInterrupt() {

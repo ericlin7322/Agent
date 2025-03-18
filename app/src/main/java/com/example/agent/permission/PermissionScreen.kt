@@ -3,12 +3,14 @@ package com.example.agent.permission
 import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -19,11 +21,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.NavController
+import com.example.agent.AccessibilityMonitorService
+import com.example.agent.R
+import com.example.agent.explore_mode.SubAgent
 import com.example.gemini.ui.permission.PermissionViewModel
 
+val images = arrayOf(
+    // Image generated using Gemini from the prompt "cupcake image"
+    R.drawable.baked_goods_1,
+    // Image generated using Gemini from the prompt "cookies images"
+    R.drawable.baked_goods_2,
+    // Image generated using Gemini from the prompt "cake images"
+    R.drawable.baked_goods_3,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,6 +65,20 @@ fun PermissionScreen(
                             context.startActivity(intent)
                         }
                     }
+                }
+            }
+            item {
+                Button(
+                    onClick = {
+                        val bitmap = BitmapFactory.decodeResource(
+                            context.resources,
+                            images[0]
+                        )
+                        val exploreMode = SubAgent()
+                        exploreMode.getResponse("Find 10 paper about llm", AccessibilityMonitorService.explore_tree, bitmap)
+                    }
+                ) {
+                    Text(text = stringResource(R.string.action_go))
                 }
             }
         }
