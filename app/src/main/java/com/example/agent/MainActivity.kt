@@ -70,7 +70,8 @@ class MainActivity : ComponentActivity() {
         val appList = resolvedInfos.map { resolveInfo ->
             val appName = packageManager.getApplicationLabel(resolveInfo.activityInfo.applicationInfo).toString()
             val packageName = resolveInfo.activityInfo.packageName
-            "$appName: $packageName"
+            val activityName = resolveInfo.activityInfo.name
+            "$appName: $packageName/$activityName"
         }
 
         val appListString = appList.joinToString("\n")
