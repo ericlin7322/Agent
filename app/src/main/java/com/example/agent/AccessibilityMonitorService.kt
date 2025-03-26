@@ -76,11 +76,13 @@ class AccessibilityMonitorService : AccessibilityService() {
         Log.d("AccessibilityMonitor", event.toString())
         Log.d("AccessibilityMonitor", rootNode.hashCode().toString())
 
-        try {
-            nav_tree = getNavigateTree(rootNode)
-            exp_tree = getExploreTree(rootNode)
-        } catch (e: Exception) {
-            Log.e("AccessibilityMonitor", "Error writing to file: ${e.message}")
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
+            try {
+                nav_tree = getNavigateTree(rootNode)
+                exp_tree = getExploreTree(rootNode)
+            } catch (e: Exception) {
+                Log.e("AccessibilityMonitor", "Error writing to file: ${e.message}")
+            }
         }
     }
 
@@ -112,7 +114,8 @@ class AccessibilityMonitorService : AccessibilityService() {
         val bounds = "[${rect.left}, ${rect.top}][${rect.right}, ${rect.bottom}]"
 
 //        Log.d("AccessibilityInfo", "$indent├─ Node: $className, Text: $text, ContentDescription: $description, ${nodeInfo.viewIdResourceName}, ${nodeInfo.uniqueId}, ${nodeInfo.windowId}")
-        val expNodeInfoText = "$indent├─ Node($simpleClassName,$text,$description,${nodeInfo.hashCode()})\n"
+//        val expNodeInfoText = "$indent├─ Node($simpleClassName,$text,$description,${nodeInfo.hashCode()},${nodeInfo.isVisibleToUser})\n"
+        val expNodeInfoText = "$indent├─ Node(class:$simpleClassName,text:$text,cont_desc:$description,hashcode:${nodeInfo.hashCode()})\n"
         stringBuilder.append(expNodeInfoText)
 
         for (i in 0 until nodeInfo.childCount) {
@@ -171,7 +174,7 @@ class AccessibilityMonitorService : AccessibilityService() {
 
 //        Log.d("AccessibilityInfo", "$indent├─ Node: $className, Text: $text, ContentDescription: $description, ${nodeInfo.viewIdResourceName}, ${nodeInfo.uniqueId}, ${nodeInfo.windowId}")
 
-        val navNodeInfoText = "$indent├─ Node($simpleClassName,$text,$description,$bounds,$states)\n"
+        val navNodeInfoText = "$indent├─ Node(class:$simpleClassName,text:$text,cont_desc:$description,bound:$bounds,$states)\n"
         stringBuilder.append(navNodeInfoText)
 
         for (i in 0 until nodeInfo.childCount) {
