@@ -21,12 +21,9 @@ class AccessibilityMonitorService : AccessibilityService() {
     }
 
     private lateinit var logger: Logger
-    private lateinit var expfileOutputStream: FileOutputStream
-    private var expfileWriter: BufferedWriter? = null
-    private val expfile = "exp_log.txt"
     private lateinit var navfileOutputStream: FileOutputStream
     private var navfileWriter: BufferedWriter? = null
-    private val navfile = "nav_log.txt"
+    private val navfile = "ui_tree.txt"
     private val handler = Handler(Looper.getMainLooper())
     private var lastEventRunnable: Runnable? = null
     private var previousRoot: AccessibilityNodeInfo? = null
@@ -55,11 +52,6 @@ class AccessibilityMonitorService : AccessibilityService() {
     private fun initializeFileOutput() {
         try {
             val directory = this.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
-            val expFile = File(directory, expfile)
-            println(expFile.absolutePath)
-            expfileOutputStream = FileOutputStream(expFile, false)
-            expfileWriter = BufferedWriter(OutputStreamWriter(expfileOutputStream))
-
             val navFile = File(directory, navfile)
             println(navFile.absolutePath)
             navfileOutputStream = FileOutputStream(navFile, false)
@@ -79,7 +71,7 @@ class AccessibilityMonitorService : AccessibilityService() {
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
             try {
                 nav_tree = getNavigateTree(rootNode)
-                exp_tree = getExploreTree(rootNode)
+//                exp_tree = getExploreTree(rootNode)
             } catch (e: Exception) {
                 Log.e("AccessibilityMonitor", "Error writing to file: ${e.message}")
             }
@@ -91,39 +83,9 @@ class AccessibilityMonitorService : AccessibilityService() {
         try {
             navfileWriter?.write(nav_tree)
             navfileWriter?.flush()
-            expfileWriter?.write(exp_tree)
-            expfileWriter?.flush()
         } finally {
             navfileWriter?.close()
-            expfileWriter?.close()
         }
-    }
-
-    private fun getExploreTree(nodeInfo: AccessibilityNodeInfo, depth: Int = 0): String {
-        val stringBuilder = StringBuilder()
-        val indent = "  ".repeat(depth)
-        val className = nodeInfo.className?.toString() ?: "null"
-        val simpleClassName = className.substring(className.lastIndexOf(".") + 1)
-        val text = nodeInfo.text?.toString() ?: "null"
-        val description = nodeInfo.contentDescription?.toString() ?: "null"
-        val stateDescription = nodeInfo.stateDescription?.toString() ?: "null"
-        val packageName = nodeInfo.packageName?.toString() ?: "null"
-
-        val rect = Rect()
-        nodeInfo.getBoundsInScreen(rect)
-        val bounds = "[${rect.left}, ${rect.top}][${rect.right}, ${rect.bottom}]"
-
-//        Log.d("AccessibilityInfo", "$indent├─ Node: $className, Text: $text, ContentDescription: $description, ${nodeInfo.viewIdResourceName}, ${nodeInfo.uniqueId}, ${nodeInfo.windowId}")
-//        val expNodeInfoText = "$indent├─ Node($simpleClassName,$text,$description,${nodeInfo.hashCode()},${nodeInfo.isVisibleToUser})\n"
-        val expNodeInfoText = "$indent├─ Node(class:$simpleClassName,text:$text,cont_desc:$description,hashcode:${nodeInfo.hashCode()})\n"
-        stringBuilder.append(expNodeInfoText)
-
-        for (i in 0 until nodeInfo.childCount) {
-            val childNode = nodeInfo.getChild(i) ?: continue
-            stringBuilder.append(getExploreTree(childNode, depth + 1))
-        }
-
-        return stringBuilder.toString()
     }
 
     private fun getNavigateTree(nodeInfo: AccessibilityNodeInfo, depth: Int = 0): String {
@@ -155,7 +117,7 @@ class AccessibilityMonitorService : AccessibilityService() {
                 "selected:${nodeInfo.isSelected}," +
 //                "contextClickable: ${nodeInfo.isContextClickable}," +
                 "password:${nodeInfo.isPassword}," +
-                "visible:${nodeInfo.isVisibleToUser},"
+                "visible:${nodeInfo.isVisibleToUser}"
 //                "textSelectable: ${nodeInfo.isTextSelectable()}"
 
 //        val states = "${nodeInfo.isCheckable}," +
@@ -174,7 +136,7 @@ class AccessibilityMonitorService : AccessibilityService() {
 
 //        Log.d("AccessibilityInfo", "$indent├─ Node: $className, Text: $text, ContentDescription: $description, ${nodeInfo.viewIdResourceName}, ${nodeInfo.uniqueId}, ${nodeInfo.windowId}")
 
-        val navNodeInfoText = "$indent├─ Node(class:$simpleClassName,text:$text,cont_desc:$description,bound:$bounds,$states)\n"
+        val navNodeInfoText = "$indent├─ Node(class:$simpleClassName,text:$text,content_desc:$description,bound:$bounds,$states,hashcode:${nodeInfo.hashCode()})\n"
         stringBuilder.append(navNodeInfoText)
 
         for (i in 0 until nodeInfo.childCount) {
@@ -190,8 +152,6 @@ class AccessibilityMonitorService : AccessibilityService() {
 
     override fun onDestroy() {
         try {
-            expfileWriter?.close()
-            expfileOutputStream.close()
             navfileWriter?.close()
             navfileOutputStream.close()
         } catch (e: IOException) {
