@@ -16,14 +16,18 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
 import com.example.agent.AccessibilityMonitorService
 import com.example.agent.R
@@ -46,6 +50,20 @@ fun PermissionScreen(
 ) {
     val context = LocalContext.current
     val permissionList by permissionViewModel.permissionList.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                PermissionViewModel.updatePermissionList(context)
+            }
+        }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     Scaffold(topBar = {
         TopAppBar(title = {
@@ -67,20 +85,20 @@ fun PermissionScreen(
                     }
                 }
             }
-            item {
-                Button(
-                    onClick = {
-                        val bitmap = BitmapFactory.decodeResource(
-                            context.resources,
-                            images[0]
-                        )
-                        val exploreMode = SubAgent()
-                        exploreMode.getResponse("Find 10 paper about llm", AccessibilityMonitorService.explore_tree, bitmap)
-                    }
-                ) {
-                    Text(text = stringResource(R.string.action_go))
-                }
-            }
+//            item {
+//                Button(
+//                    onClick = {
+//                        val bitmap = BitmapFactory.decodeResource(
+//                            context.resources,
+//                            images[0]
+//                        )
+//                        val exploreMode = SubAgent()
+//                        exploreMode.getResponse("Find 10 paper about llm", AccessibilityMonitorService.explore_tree, bitmap)
+//                    }
+//                ) {
+//                    Text(text = stringResource(R.string.action_go))
+//                }
+//            }
         }
     }
 }

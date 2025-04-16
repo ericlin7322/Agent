@@ -14,6 +14,8 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.OutputStreamWriter
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 
 class AccessibilityMonitorService : AccessibilityService() {
     companion object {
@@ -24,6 +26,9 @@ class AccessibilityMonitorService : AccessibilityService() {
     private lateinit var navfileOutputStream: FileOutputStream
     private var navfileWriter: BufferedWriter? = null
     private val navfile = "ui_tree.txt"
+    private lateinit var statsfileOutputStream: FileOutputStream
+    private var statsfileWriter: BufferedWriter? = null
+    private val statsfile = "stats.txt"
     private val handler = Handler(Looper.getMainLooper())
     private var lastEventRunnable: Runnable? = null
     private var previousRoot: AccessibilityNodeInfo? = null
@@ -75,6 +80,29 @@ class AccessibilityMonitorService : AccessibilityService() {
             } catch (e: Exception) {
                 Log.e("AccessibilityMonitor", "Error writing to file: ${e.message}")
             }
+        }
+
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            val packageName = event.packageName?.toString()
+            val directory = this.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
+            val statsFile = File(directory, statsfile)
+
+            val currentDateTime = ZonedDateTime.now()
+            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm zzzz")
+            val formattedDateTime = currentDateTime.format(formatter)
+
+            val json = """
+                {
+                  "current foregroundApp": "$packageName",
+                  "current time": "$formattedDateTime"
+                }
+            """.trimIndent()
+
+            statsfileOutputStream = FileOutputStream(statsFile, false)
+            statsfileWriter = BufferedWriter(OutputStreamWriter(statsfileOutputStream))
+            statsfileWriter?.write(json)
+            statsfileWriter?.flush()
+            Log.d("AppTracker", "Foreground app: $packageName")
         }
     }
 
